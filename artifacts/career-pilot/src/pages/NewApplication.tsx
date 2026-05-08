@@ -25,13 +25,13 @@ export default function NewApplication() {
   const [tab, setTab] = useState<"url" | "text">("url");
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
-  const [autoSend, setAutoSend] = useState(true);
+  const [autoMode, setAutoMode] = useState(false);
 
   const { data: profile } = useGetProfile();
   const create = useCreateApplication();
 
   const profileReady = !!(profile?.fullName && profile?.email);
-  const resumeReady = !!profile?.resumeObjectPath;
+  const resumeReady = !!profile?.hasResume;
 
   const submit = async () => {
     if (tab === "url" && !url.trim()) {
@@ -49,8 +49,8 @@ export default function NewApplication() {
           sourceType: tab,
           sourceUrl: tab === "url" ? url.trim() : null,
           sourceText: tab === "text" ? text.trim() : null,
-          autoProcess: true,
-          autoSend,
+          mode: autoMode ? "auto" : "preview",
+          autoSend: autoMode,
         },
       });
       queryClient.invalidateQueries({ queryKey: getListApplicationsQueryKey() });
@@ -58,7 +58,9 @@ export default function NewApplication() {
       toast.success(
         created.status === "sent"
           ? "Sent. Application is on its way."
-          : "Drafted. Review the details before sending.",
+          : autoMode
+            ? "Drafted. Review the details before sending."
+            : "Job parsed. Review the details, then generate a letter.",
       );
       navigate(`/applications/${created.id}`);
     } catch (err) {
@@ -133,18 +135,19 @@ export default function NewApplication() {
 
           <div className="flex items-start justify-between gap-6 border-t border-border pt-5">
             <div>
-              <Label htmlFor="auto-send" className="text-sm font-medium">
-                Auto-send when validation passes
+              <Label htmlFor="auto-mode" className="text-sm font-medium">
+                Full-auto: draft and send when validation passes
               </Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                If any quality gate fails, we'll queue it for your review instead.
+                Off (default) parses the job so you can review the extracted details before
+                generating a letter. On drafts and sends in one shot when every gate passes.
               </p>
             </div>
             <Switch
-              id="auto-send"
-              checked={autoSend}
-              onCheckedChange={setAutoSend}
-              data-testid="switch-auto-send"
+              id="auto-mode"
+              checked={autoMode}
+              onCheckedChange={setAutoMode}
+              data-testid="switch-auto-mode"
             />
           </div>
 
@@ -158,12 +161,12 @@ export default function NewApplication() {
             {create.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Drafting...
+                {autoMode ? "Drafting..." : "Parsing..."}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                {autoSend ? "Draft, validate, and send" : "Draft and validate"}
+                {autoMode ? "Draft, validate, and send" : "Parse job for review"}
               </>
             )}
           </Button>

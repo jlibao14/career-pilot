@@ -777,6 +777,90 @@ export const useProcessApplication = <
 };
 
 /**
+ * @summary Draft the cover letter (assumes the job has already been parsed)
+ */
+export const getDraftApplicationUrl = (id: number) => {
+  return `/api/applications/${id}/draft`;
+};
+
+export const draftApplication = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Application> => {
+  return customFetch<Application>(getDraftApplicationUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDraftApplicationMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof draftApplication>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof draftApplication>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["draftApplication"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof draftApplication>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return draftApplication(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DraftApplicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof draftApplication>>
+>;
+
+export type DraftApplicationMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Draft the cover letter (assumes the job has already been parsed)
+ */
+export const useDraftApplication = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof draftApplication>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof draftApplication>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDraftApplicationMutationOptions(options));
+};
+
+/**
  * @summary Manually edit the drafted cover letter
  */
 export const getUpdateApplicationLetterUrl = (id: number) => {

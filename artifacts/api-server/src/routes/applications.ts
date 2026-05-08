@@ -56,44 +56,49 @@ router.post("/applications", async (req, res): Promise<void> => {
     })
     .returning();
 
-  if (parsed.data.autoProcess !== false) {
-    try {
-      const processed = await runProcessPipeline(created!.id);
-      if (parsed.data.autoSend !== false && processed.validation?.passed) {
-        try {
-          const sent = await runSendPipeline(processed.id);
-          res.status(201).json(sent);
-          return;
-        } catch (sendErr) {
-          req.log.error({ err: sendErr }, "Auto-send failed; returning draft for review");
-          const [reloaded] = await db
-            .select()
-            .from(applicationsTable)
-            .where(eq(applicationsTable.id, created!.id));
-          res.status(201).json(reloaded);
-          return;
-        }
-      }
-      res.status(201).json(processed);
-      return;
-    } catch (err) {
-      req.log.error({ err }, "Auto-processing failed");
-      const message = err instanceof Error ? err.message : "Processing failed";
-      // Ensure status is failed even if pipeline didn't write it
-      await db
-        .update(applicationsTable)
-        .set({ status: "failed", errorMessage: message })
-        .where(eq(applicationsTable.id, created!.id));
-      const [reloaded] = await db
-        .select()
-        .from(applicationsTable)
-        .where(eq(applicationsTable.id, created!.id));
-      res.status(201).json(reloaded);
+  const mode = parsed.data.mode ?? "preview";
+
+  // Always parse so the user has the extracted job details to review
+  try {
+    const parsedApp = await runParsePipeline(created!.id);
+
+    if (mode !== "auto") {
+      res.status(201).json(parsedApp);
       return;
     }
-  }
 
-  res.status(201).json(created);
+    const drafted = await runDraftPipeline(parsedApp.id);
+
+    if (parsed.data.autoSend !== false && drafted.validation?.passed) {
+      try {
+        const sent = await runSendPipeline(drafted.id, { autoSent: true });
+        res.status(201).json(sent);
+        return;
+      } catch (sendErr) {
+        req.log.error({ err: sendErr }, "Auto-send failed; returning draft for review");
+        const [reloaded] = await db
+          .select()
+          .from(applicationsTable)
+          .where(eq(applicationsTable.id, created!.id));
+        res.status(201).json(reloaded);
+        return;
+      }
+    }
+
+    res.status(201).json(drafted);
+  } catch (err) {
+    req.log.error({ err }, "Auto-processing failed");
+    const message = err instanceof Error ? err.message : "Processing failed";
+    await db
+      .update(applicationsTable)
+      .set({ status: "failed", errorMessage: message })
+      .where(eq(applicationsTable.id, created!.id));
+    const [reloaded] = await db
+      .select()
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, created!.id));
+    res.status(201).json(reloaded);
+  }
 });
 
 router.get("/applications/:id", async (req, res): Promise<void> => {
@@ -120,6 +125,7 @@ router.delete("/applications/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// Parse + draft + validate (used by the "process again" button)
 router.post("/applications/:id/process", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (id == null) {
@@ -127,11 +133,37 @@ router.post("/applications/:id/process", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const processed = await runProcessPipeline(id);
-    res.json(processed);
+    await runParsePipeline(id);
+    const drafted = await runDraftPipeline(id);
+    res.json(drafted);
   } catch (err) {
     req.log.error({ err }, "Process failed");
     const message = err instanceof Error ? err.message : "Processing failed";
+    if (message === "Application not found") {
+      res.status(404).json({ error: message });
+      return;
+    }
+    await db
+      .update(applicationsTable)
+      .set({ status: "failed", errorMessage: message })
+      .where(eq(applicationsTable.id, id));
+    res.status(500).json({ error: message });
+  }
+});
+
+// Draft (assumes parse already ran). Used by the "Generate cover letter" button.
+router.post("/applications/:id/draft", async (req, res): Promise<void> => {
+  const id = parseId(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  try {
+    const drafted = await runDraftPipeline(id);
+    res.json(drafted);
+  } catch (err) {
+    req.log.error({ err }, "Draft failed");
+    const message = err instanceof Error ? err.message : "Draft failed";
     if (message === "Application not found") {
       res.status(404).json({ error: message });
       return;
@@ -167,7 +199,6 @@ router.patch("/applications/:id/letter", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  // Re-validate after edit
   const profile = (await db.select().from(profileTable).limit(1))[0];
   const validation = await validateApplication({
     coverLetter: row.coverLetter,
@@ -238,7 +269,7 @@ router.post("/applications/:id/send", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const sent = await runSendPipeline(id);
+    const sent = await runSendPipeline(id, { autoSent: false });
     res.json(sent);
   } catch (err) {
     req.log.error({ err }, "Send failed");
@@ -249,7 +280,7 @@ router.post("/applications/:id/send", async (req, res): Promise<void> => {
 
 // ---------- pipeline helpers ----------
 
-async function runProcessPipeline(id: number) {
+async function runParsePipeline(id: number) {
   const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
   if (!app) throw new Error("Application not found");
 
@@ -282,10 +313,10 @@ async function runProcessPipeline(id: number) {
 
   const parsed = await parseJob(jobText, app.sourceUrl);
 
-  await db
+  const [updated] = await db
     .update(applicationsTable)
     .set({
-      status: "drafting",
+      status: "needs_review",
       company: parsed.company,
       roleTitle: parsed.roleTitle,
       location: parsed.location,
@@ -294,12 +325,37 @@ async function runProcessPipeline(id: number) {
       jobSummary: parsed.jobSummary,
       keyRequirements: parsed.keyRequirements,
     })
+    .where(eq(applicationsTable.id, id))
+    .returning();
+
+  return updated!;
+}
+
+async function runDraftPipeline(id: number) {
+  const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
+  if (!app) throw new Error("Application not found");
+
+  if (!app.company || !app.roleTitle || !app.jobSummary) {
+    throw new Error("Job has not been parsed yet — run parse first");
+  }
+
+  await db
+    .update(applicationsTable)
+    .set({ status: "drafting", errorMessage: null })
     .where(eq(applicationsTable.id, id));
 
   const [profile] = await db.select().from(profileTable).limit(1);
   if (!profile) throw new Error("Profile not configured");
 
-  const drafted = await draftCoverLetter(profile, parsed);
+  const drafted = await draftCoverLetter(profile, {
+    company: app.company,
+    roleTitle: app.roleTitle,
+    location: app.location,
+    recipientEmail: app.recipientEmail,
+    recipientName: app.recipientName,
+    jobSummary: app.jobSummary,
+    keyRequirements: app.keyRequirements ?? [],
+  });
 
   await db
     .update(applicationsTable)
@@ -313,9 +369,9 @@ async function runProcessPipeline(id: number) {
   const validation = await validateApplication({
     coverLetter: drafted.coverLetter,
     emailSubject: drafted.emailSubject,
-    recipientEmail: parsed.recipientEmail,
-    company: parsed.company,
-    roleTitle: parsed.roleTitle,
+    recipientEmail: app.recipientEmail,
+    company: app.company,
+    roleTitle: app.roleTitle,
     hasResume: !!profile.resumeObjectPath,
   });
 
@@ -331,14 +387,13 @@ async function runProcessPipeline(id: number) {
   return final!;
 }
 
-async function runSendPipeline(id: number) {
+async function runSendPipeline(id: number, opts: { autoSent: boolean }) {
   const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
   if (!app) throw new Error("Application not found");
 
   const [profile] = await db.select().from(profileTable).limit(1);
   if (!profile) throw new Error("Profile not configured");
 
-  // Re-validate before send
   const validation = await validateApplication({
     coverLetter: app.coverLetter,
     emailSubject: app.emailSubject,
@@ -362,7 +417,6 @@ async function runSendPipeline(id: number) {
     .set({ status: "sending", errorMessage: null })
     .where(eq(applicationsTable.id, id));
 
-  // Pull resume bytes for attachment — required, abort if it fails
   let attachment: { filename: string; content: string; contentType: string };
   try {
     attachment = await loadResumeAttachment(profile.resumeObjectPath, profile.resumeFileName);
@@ -388,7 +442,7 @@ async function runSendPipeline(id: number) {
       .set({
         status: "sent",
         sentAt: new Date(),
-        autoSent: true,
+        autoSent: opts.autoSent,
         agentmailMessageId: result.messageId,
         validation,
       })

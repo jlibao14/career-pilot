@@ -27,8 +27,8 @@ export const GetProfileResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
-  resumeObjectPath: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
+  hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -58,8 +58,8 @@ export const UpdateProfileResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
-  resumeObjectPath: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
+  hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -83,8 +83,8 @@ export const SetResumeResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
-  resumeObjectPath: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
+  hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -136,15 +136,25 @@ export const ListApplicationsResponse = zod.array(ListApplicationsResponseItem);
 /**
  * @summary Create a new application from a job URL or pasted job text
  */
-export const createApplicationBodyAutoProcessDefault = true;
+export const createApplicationBodyModeDefault = `preview`;
 export const createApplicationBodyAutoSendDefault = true;
 
 export const CreateApplicationBody = zod.object({
   sourceType: zod.enum(["url", "text"]),
   sourceUrl: zod.string().nullish(),
   sourceText: zod.string().nullish(),
-  autoProcess: zod.boolean().default(createApplicationBodyAutoProcessDefault),
-  autoSend: zod.boolean().default(createApplicationBodyAutoSendDefault),
+  mode: zod
+    .enum(["preview", "auto"])
+    .default(createApplicationBodyModeDefault)
+    .describe(
+      "preview = parse only, then user clicks Generate. auto = parse + draft + auto-send when gates pass.",
+    ),
+  autoSend: zod
+    .boolean()
+    .default(createApplicationBodyAutoSendDefault)
+    .describe(
+      "Only honored when mode=auto. If true, sends when validation passes.",
+    ),
 });
 
 /**
@@ -209,6 +219,53 @@ export const ProcessApplicationParams = zod.object({
 });
 
 export const ProcessApplicationResponse = zod.object({
+  id: zod.number(),
+  status: zod
+    .string()
+    .describe(
+      "draft | parsing | drafting | validating | ready | needs_review | sending | sent | failed",
+    ),
+  sourceType: zod.string().describe("url | text"),
+  sourceUrl: zod.string().nullish(),
+  sourceText: zod.string().nullish(),
+  company: zod.string().nullish(),
+  roleTitle: zod.string().nullish(),
+  location: zod.string().nullish(),
+  recipientEmail: zod.string().nullish(),
+  recipientName: zod.string().nullish(),
+  jobSummary: zod.string().nullish(),
+  keyRequirements: zod.array(zod.string()).optional(),
+  coverLetter: zod.string().nullish(),
+  emailSubject: zod.string().nullish(),
+  validation: zod
+    .object({
+      passed: zod.boolean(),
+      checks: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+          passed: zod.boolean(),
+          detail: zod.string().nullish(),
+        }),
+      ),
+    })
+    .optional(),
+  autoSent: zod.boolean().optional(),
+  sentAt: zod.coerce.date().nullish(),
+  errorMessage: zod.string().nullish(),
+  agentmailMessageId: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Draft the cover letter (assumes the job has already been parsed)
+ */
+export const DraftApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DraftApplicationResponse = zod.object({
   id: zod.number(),
   status: zod
     .string()

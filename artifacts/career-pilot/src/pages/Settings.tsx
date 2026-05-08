@@ -117,7 +117,7 @@ export default function Settings() {
       <Card>
         <CardContent className="p-6 space-y-5">
           <h2 className="font-serif text-lg font-medium">Master resume</h2>
-          {profile.resumeFileName ? (
+          {profile.hasResume && profile.resumeFileName ? (
             <div className="flex items-center justify-between gap-4 p-4 rounded-md border border-border bg-muted/30">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary">
