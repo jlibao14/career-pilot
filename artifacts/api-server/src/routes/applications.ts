@@ -18,8 +18,9 @@ const storage = new ObjectStorageService();
 function parseId(raw: string | string[] | undefined): number | null {
   if (raw == null) return null;
   const v = Array.isArray(raw) ? raw[0] : raw;
-  const n = parseInt(v ?? "", 10);
-  return Number.isFinite(n) ? n : null;
+  if (!v || !/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
 router.get("/applications", async (_req, res): Promise<void> => {
