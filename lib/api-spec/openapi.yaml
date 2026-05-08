@@ -344,31 +344,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-  /storage/objects/{objectPath}:
-    get:
-      tags: [storage]
-      operationId: getStorageObject
-      summary: Serve a private object
-      parameters:
-        - name: objectPath
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Object content
-          content:
-            "*/*":
-              schema:
-                type: string
-                format: binary
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
 
 components:
   schemas:

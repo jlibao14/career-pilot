@@ -335,7 +335,7 @@ async function runDraftPipeline(id: number) {
   const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
   if (!app) throw new Error("Application not found");
 
-  if (!app.company || !app.roleTitle || !app.jobSummary) {
+  if (!app.company || !app.roleTitle) {
     throw new Error("Job has not been parsed yet — run parse first");
   }
 
@@ -353,7 +353,11 @@ async function runDraftPipeline(id: number) {
     location: app.location,
     recipientEmail: app.recipientEmail,
     recipientName: app.recipientName,
-    jobSummary: app.jobSummary,
+    jobSummary:
+      app.jobSummary ??
+      (app.sourceText
+        ? app.sourceText.slice(0, 1500)
+        : `${app.roleTitle} role at ${app.company}.`),
     keyRequirements: app.keyRequirements ?? [],
   });
 
