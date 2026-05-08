@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Career Pilot API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile and resume
+  - name: applications
+    description: Job applications
+  - name: dashboard
+    description: Dashboard summaries
+  - name: storage
+    description: Object storage
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,554 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get the current user profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update the current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /resume:
+    post:
+      operationId: setResume
+      tags: [profile]
+      summary: Register an uploaded resume PDF as the master resume
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetResumeBody"
+      responses:
+        "200":
+          description: Resume registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [applications]
+      summary: List all applications, newest first
+      responses:
+        "200":
+          description: Applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+    post:
+      operationId: createApplication
+      tags: [applications]
+      summary: Create a new application from a job URL or pasted job text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApplicationBody"
+      responses:
+        "201":
+          description: Created application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}:
+    get:
+      operationId: getApplication
+      tags: [applications]
+      summary: Get one application by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      operationId: deleteApplication
+      tags: [applications]
+      summary: Delete an application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /applications/{id}/process:
+    post:
+      operationId: processApplication
+      tags: [applications]
+      summary: Parse the job, draft the cover letter, run the validation gate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Processed application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /applications/{id}/letter:
+    patch:
+      operationId: updateApplicationLetter
+      tags: [applications]
+      summary: Manually edit the drafted cover letter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLetterBody"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}/recipient:
+    patch:
+      operationId: updateApplicationRecipient
+      tags: [applications]
+      summary: Manually set or correct the recipient email
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRecipientBody"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}/send:
+    post:
+      operationId: sendApplication
+      tags: [applications]
+      summary: Send the application email via AgentMail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sent application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          description: Validation gate failed or required field missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Application stats for the dashboard
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to generate URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [storage]
+      operationId: getPublicObject
+      summary: Serve a public asset
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/objects/{objectPath}:
+    get:
+      tags: [storage]
+      operationId: getStorageObject
+      summary: Serve a private object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Profile:
+      type: object
+      required: [id, fullName, email, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        linkedin:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        headline:
+          type: ["string", "null"]
+        summary:
+          type: ["string", "null"]
+        resumeObjectPath:
+          type: ["string", "null"]
+        resumeFileName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateProfileBody:
+      type: object
+      required: [fullName, email]
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          minLength: 1
+        phone:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        linkedin:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        headline:
+          type: ["string", "null"]
+        summary:
+          type: ["string", "null"]
+
+    SetResumeBody:
+      type: object
+      required: [objectPath, fileName]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+        fileName:
+          type: string
+          minLength: 1
+
+    Application:
+      type: object
+      required: [id, status, sourceType, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          description: draft | parsing | drafting | validating | ready | needs_review | sending | sent | failed
+        sourceType:
+          type: string
+          description: url | text
+        sourceUrl:
+          type: ["string", "null"]
+        sourceText:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        roleTitle:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        recipientEmail:
+          type: ["string", "null"]
+        recipientName:
+          type: ["string", "null"]
+        jobSummary:
+          type: ["string", "null"]
+        keyRequirements:
+          type: array
+          items:
+            type: string
+        coverLetter:
+          type: ["string", "null"]
+        emailSubject:
+          type: ["string", "null"]
+        validation:
+          $ref: "#/components/schemas/ValidationReport"
+        autoSent:
+          type: boolean
+        sentAt:
+          type: ["string", "null"]
+          format: date-time
+        errorMessage:
+          type: ["string", "null"]
+        agentmailMessageId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ValidationReport:
+      type: object
+      required: [passed, checks]
+      properties:
+        passed:
+          type: boolean
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationCheck"
+
+    ValidationCheck:
+      type: object
+      required: [id, label, passed]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        passed:
+          type: boolean
+        detail:
+          type: ["string", "null"]
+
+    CreateApplicationBody:
+      type: object
+      required: [sourceType]
+      properties:
+        sourceType:
+          type: string
+          enum: [url, text]
+        sourceUrl:
+          type: ["string", "null"]
+        sourceText:
+          type: ["string", "null"]
+        autoProcess:
+          type: boolean
+          default: true
+        autoSend:
+          type: boolean
+          default: true
+
+    UpdateLetterBody:
+      type: object
+      required: [coverLetter]
+      properties:
+        coverLetter:
+          type: string
+        emailSubject:
+          type: ["string", "null"]
+
+    UpdateRecipientBody:
+      type: object
+      required: [recipientEmail]
+      properties:
+        recipientEmail:
+          type: string
+          minLength: 1
+        recipientName:
+          type: ["string", "null"]
+
+    DashboardSummary:
+      type: object
+      required: [total, sent, needsReview, drafting, failed]
+      properties:
+        total:
+          type: integer
+        sent:
+          type: integer
+        needsReview:
+          type: integer
+        drafting:
+          type: integer
+        failed:
+          type: integer
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
