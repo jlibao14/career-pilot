@@ -230,12 +230,21 @@ router.patch("/applications/:id/recipient", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const updates: Record<string, unknown> = {
+    recipientEmail: parsed.data.recipientEmail,
+    recipientName: parsed.data.recipientName ?? null,
+  };
+  if (parsed.data.company !== undefined) {
+    const c = parsed.data.company?.trim();
+    updates.company = c ? c : null;
+  }
+  if (parsed.data.roleTitle !== undefined) {
+    const r = parsed.data.roleTitle?.trim();
+    updates.roleTitle = r ? r : null;
+  }
   const [row] = await db
     .update(applicationsTable)
-    .set({
-      recipientEmail: parsed.data.recipientEmail,
-      recipientName: parsed.data.recipientName ?? null,
-    })
+    .set(updates)
     .where(eq(applicationsTable.id, id))
     .returning();
   if (!row) {
@@ -335,8 +344,10 @@ async function runDraftPipeline(id: number) {
   const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
   if (!app) throw new Error("Application not found");
 
-  if (!app.company || !app.roleTitle) {
-    throw new Error("Job has not been parsed yet — run parse first");
+  const company = app.company?.trim() || "the company";
+  const roleTitle = app.roleTitle?.trim() || "the role";
+  if (!app.company && !app.roleTitle && !app.sourceText && !app.sourceUrl) {
+    throw new Error("Nothing to draft from — add company, role, or job content first");
   }
 
   await db
@@ -348,8 +359,8 @@ async function runDraftPipeline(id: number) {
   if (!profile) throw new Error("Profile not configured");
 
   const drafted = await draftCoverLetter(profile, {
-    company: app.company,
-    roleTitle: app.roleTitle,
+    company,
+    roleTitle,
     location: app.location,
     recipientEmail: app.recipientEmail,
     recipientName: app.recipientName,
@@ -357,7 +368,7 @@ async function runDraftPipeline(id: number) {
       app.jobSummary ??
       (app.sourceText
         ? app.sourceText.slice(0, 1500)
-        : `${app.roleTitle} role at ${app.company}.`),
+        : `${roleTitle} role at ${company}.`),
     keyRequirements: app.keyRequirements ?? [],
   });
 

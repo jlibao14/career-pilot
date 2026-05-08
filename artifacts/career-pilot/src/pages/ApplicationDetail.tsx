@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useLocation } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type Query } from "@tanstack/react-query";
+import type { Application } from "@workspace/api-client-react";
 import {
   useGetApplication,
   useUpdateApplicationLetter,
@@ -37,11 +38,14 @@ export default function ApplicationDetail() {
 
   const { data: app, isLoading } = useGetApplication(id, {
     query: {
-      refetchInterval: (q: { state: { data?: { status?: string } } }) => {
-        const status = q.state.data?.status;
-        return status && ["parsing", "drafting", "validating", "sending"].includes(status) ? 1500 : false;
+      queryKey: getGetApplicationQueryKey(id),
+      refetchInterval: (query: Query<Application>) => {
+        const status = query.state.data?.status;
+        return status && ["parsing", "drafting", "validating", "sending"].includes(status)
+          ? 1500
+          : false;
       },
-    } as never,
+    },
   });
 
   const updateLetter = useUpdateApplicationLetter();
@@ -55,6 +59,8 @@ export default function ApplicationDetail() {
   const [subjectDraft, setSubjectDraft] = useState("");
   const [recipient, setRecipient] = useState("");
   const [recipientName, setRecipientName] = useState("");
+  const [companyDraft, setCompanyDraft] = useState("");
+  const [roleDraft, setRoleDraft] = useState("");
 
   useEffect(() => {
     if (app) {
@@ -62,8 +68,18 @@ export default function ApplicationDetail() {
       setSubjectDraft(app.emailSubject ?? "");
       setRecipient(app.recipientEmail ?? "");
       setRecipientName(app.recipientName ?? "");
+      setCompanyDraft(app.company ?? "");
+      setRoleDraft(app.roleTitle ?? "");
     }
-  }, [app?.id, app?.coverLetter, app?.emailSubject, app?.recipientEmail, app?.recipientName]);
+  }, [
+    app?.id,
+    app?.coverLetter,
+    app?.emailSubject,
+    app?.recipientEmail,
+    app?.recipientName,
+    app?.company,
+    app?.roleTitle,
+  ]);
 
   if (isLoading || !app) {
     return (
@@ -101,10 +117,15 @@ export default function ApplicationDetail() {
     try {
       await updateRecipient.mutateAsync({
         id,
-        data: { recipientEmail: recipient.trim(), recipientName: recipientName.trim() || null },
+        data: {
+          recipientEmail: recipient.trim(),
+          recipientName: recipientName.trim() || null,
+          company: companyDraft.trim() || null,
+          roleTitle: roleDraft.trim() || null,
+        },
       });
       invalidate();
-      toast.success("Recipient updated.");
+      toast.success("Details updated.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     }
@@ -145,7 +166,7 @@ export default function ApplicationDetail() {
   const isProcessing = ["parsing", "drafting", "validating", "sending"].includes(app.status);
   const validationPassed = app.validation?.passed ?? false;
   const hasLetter = !!app.coverLetter;
-  const hasParsedJob = !!(app.company && app.roleTitle);
+  const canDraft = !!(app.company || app.roleTitle || app.sourceText || app.sourceUrl);
 
   const generate = async () => {
     try {
@@ -261,7 +282,7 @@ export default function ApplicationDetail() {
                     {letterDraft.split(/\s+/).filter(Boolean).length} words
                   </span>
                 </div>
-                {!hasLetter && hasParsedJob && !isProcessing ? (
+                {!hasLetter && canDraft && !isProcessing ? (
                   <div className="border border-dashed border-border rounded-md p-8 text-center">
                     <Sparkles className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
                     <div className="font-medium">Ready to draft</div>
@@ -315,8 +336,20 @@ export default function ApplicationDetail() {
           <Card>
             <CardContent className="p-5 space-y-4">
               <div>
-                <h3 className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">Recipient</h3>
+                <h3 className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">Job details</h3>
                 <div className="space-y-2">
+                  <Input
+                    placeholder="Company"
+                    value={companyDraft}
+                    onChange={(e) => setCompanyDraft(e.target.value)}
+                    data-testid="input-company"
+                  />
+                  <Input
+                    placeholder="Role title"
+                    value={roleDraft}
+                    onChange={(e) => setRoleDraft(e.target.value)}
+                    data-testid="input-role-title"
+                  />
                   <Input
                     placeholder="recruiter@company.com"
                     value={recipient}
@@ -330,7 +363,7 @@ export default function ApplicationDetail() {
                     data-testid="input-recipient-name"
                   />
                   <Button onClick={saveRecipient} variant="outline" size="sm" className="w-full" disabled={updateRecipient.isPending} data-testid="button-save-recipient">
-                    Save recipient
+                    Save details
                   </Button>
                 </div>
               </div>

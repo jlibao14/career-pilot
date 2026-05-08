@@ -375,6 +375,8 @@ export const UpdateApplicationRecipientParams = zod.object({
 export const UpdateApplicationRecipientBody = zod.object({
   recipientEmail: zod.string().min(1),
   recipientName: zod.string().nullish(),
+  company: zod.string().nullish(),
+  roleTitle: zod.string().nullish(),
 });
 
 export const UpdateApplicationRecipientResponse = zod.object({
