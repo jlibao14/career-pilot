@@ -26,6 +26,17 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   try {
     const { name, size, contentType } = parsed.data;
 
+    const lowerName = name.toLowerCase();
+    if (contentType !== "application/pdf" || !lowerName.endsWith(".pdf")) {
+      res.status(400).json({ error: "Only PDF uploads are supported (application/pdf, .pdf)" });
+      return;
+    }
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (size > MAX_BYTES) {
+      res.status(400).json({ error: `File too large (max ${MAX_BYTES} bytes)` });
+      return;
+    }
+
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
