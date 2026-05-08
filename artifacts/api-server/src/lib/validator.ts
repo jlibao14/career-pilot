@@ -171,8 +171,8 @@ export async function validateApplication(input: {
       checks.push({
         id: "grammar_spelling",
         label: "Grammar and spelling",
-        passed: true,
-        detail: "Grammar check skipped (model unavailable)",
+        passed: false,
+        detail: "Grammar check unavailable — please review manually before sending",
       });
     }
   } else {
