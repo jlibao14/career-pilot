@@ -23,4 +23,8 @@ export interface UpdateProfileBody {
   headline?: string | null;
   /** @nullable */
   summary?: string | null;
+  /** @nullable */
+  preferredTone?: string | null;
+  /** @nullable */
+  keyAchievements?: string | null;
 }

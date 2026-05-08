@@ -26,6 +26,7 @@ export default function Settings() {
   const [form, setForm] = useState({
     fullName: "", email: "", phone: "", location: "",
     linkedin: "", website: "", headline: "", summary: "",
+    preferredTone: "", keyAchievements: "",
   });
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,6 +42,8 @@ export default function Settings() {
         website: profile.website ?? "",
         headline: profile.headline ?? "",
         summary: profile.summary ?? "",
+        preferredTone: profile.preferredTone ?? "",
+        keyAchievements: profile.keyAchievements ?? "",
       });
     }
   }, [profile?.id]);
@@ -61,6 +64,8 @@ export default function Settings() {
           website: form.website.trim() || null,
           headline: form.headline.trim() || null,
           summary: form.summary.trim() || null,
+          preferredTone: form.preferredTone.trim() || null,
+          keyAchievements: form.keyAchievements.trim() || null,
         },
       });
       queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
@@ -206,6 +211,25 @@ export default function Settings() {
               rows={6}
               placeholder="A few sentences about who you are, what you've built, and what you're looking for. The model uses this verbatim — be concrete."
               data-testid="textarea-summary"
+            />
+          </Field>
+
+          <Field label="Preferred tone">
+            <Input
+              value={form.preferredTone}
+              onChange={(e) => setForm({ ...form, preferredTone: e.target.value })}
+              placeholder="e.g. confident and warm; or dry and analytical; or candid and direct"
+              data-testid="input-tone"
+            />
+          </Field>
+
+          <Field label="Key achievements / wins">
+            <Textarea
+              value={form.keyAchievements}
+              onChange={(e) => setForm({ ...form, keyAchievements: e.target.value })}
+              rows={5}
+              placeholder={"One per line, with concrete metrics. The model will pick the most relevant ones for each role.\nExample:\nGrew ARR from $4M to $40M in 3 years\nLed acquisition of two competitors"}
+              data-testid="textarea-achievements"
             />
           </Field>
 

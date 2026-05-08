@@ -10,6 +10,8 @@ export const profileTable = pgTable("profile", {
   website: text("website"),
   headline: text("headline"),
   summary: text("summary"),
+  preferredTone: text("preferred_tone"),
+  keyAchievements: text("key_achievements"),
   resumeObjectPath: text("resume_object_path"),
   resumeFileName: text("resume_file_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -23,6 +23,10 @@ export interface Profile {
   /** @nullable */
   summary?: string | null;
   /** @nullable */
+  preferredTone?: string | null;
+  /** @nullable */
+  keyAchievements?: string | null;
+  /** @nullable */
   resumeFileName?: string | null;
   hasResume?: boolean;
   createdAt: Date;

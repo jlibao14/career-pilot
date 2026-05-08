@@ -27,6 +27,8 @@ export const GetProfileResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
+  preferredTone: zod.string().nullish(),
+  keyAchievements: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
   hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),
@@ -46,6 +48,8 @@ export const UpdateProfileBody = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
+  preferredTone: zod.string().nullish(),
+  keyAchievements: zod.string().nullish(),
 });
 
 export const UpdateProfileResponse = zod.object({
@@ -58,6 +62,8 @@ export const UpdateProfileResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
+  preferredTone: zod.string().nullish(),
+  keyAchievements: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
   hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),
@@ -83,6 +89,8 @@ export const SetResumeResponse = zod.object({
   website: zod.string().nullish(),
   headline: zod.string().nullish(),
   summary: zod.string().nullish(),
+  preferredTone: zod.string().nullish(),
+  keyAchievements: zod.string().nullish(),
   resumeFileName: zod.string().nullish(),
   hasResume: zod.boolean().optional(),
   createdAt: zod.coerce.date(),

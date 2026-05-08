@@ -14,7 +14,7 @@ export async function draftCoverLetter(
   const system = `You are a senior career strategist drafting executive-tone cover letters.
 
 Voice & rules:
-- Tone: confident, calm, professional, with quiet personality. Never sycophantic, never breathless.
+- Default tone: confident, calm, professional, with quiet personality. Never sycophantic, never breathless. If the candidate provides a "preferred tone", honor it while staying executive-grade.
 - Length: 200-280 words, exactly 3 paragraphs.
 - Paragraph 1: hook tying the candidate's strongest credential to the role.
 - Paragraph 2: 2-3 concrete, quantified proof points relevant to the posting.
@@ -32,6 +32,17 @@ Voice & rules:
 - Headline: ${profile.headline ?? "(none)"}
 - Location: ${profile.location ?? "(none)"}
 - Summary: ${profile.summary ?? "(none)"}
+- Preferred tone: ${profile.preferredTone ?? "(default executive)"}
+- Key achievements / wins (use these verbatim where relevant; never invent metrics):
+${
+  profile.keyAchievements
+    ? profile.keyAchievements
+        .split("\n")
+        .map((l) => `  - ${l.trim()}`)
+        .filter((l) => l.length > 4)
+        .join("\n")
+    : "  - (none provided)"
+}
 - LinkedIn: ${profile.linkedin ?? "(none)"}
 - Website: ${profile.website ?? "(none)"}
 
