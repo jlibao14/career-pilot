@@ -15,9 +15,14 @@ async function ensureProfile() {
   return created!;
 }
 
+function publicProfile(p: Awaited<ReturnType<typeof ensureProfile>>) {
+  const { resumeObjectPath: _path, ...rest } = p;
+  return { ...rest, hasResume: !!p.resumeObjectPath };
+}
+
 router.get("/profile", async (_req, res): Promise<void> => {
   const profile = await ensureProfile();
-  res.json(profile);
+  res.json(publicProfile(profile));
 });
 
 router.put("/profile", async (req, res): Promise<void> => {
@@ -34,7 +39,7 @@ router.put("/profile", async (req, res): Promise<void> => {
     .where(eq(profileTable.id, existing.id))
     .returning();
 
-  res.json(updated);
+  res.json(publicProfile(updated!));
 });
 
 router.post("/resume", async (req, res): Promise<void> => {
@@ -54,7 +59,7 @@ router.post("/resume", async (req, res): Promise<void> => {
     .where(eq(profileTable.id, existing.id))
     .returning();
 
-  res.json(updated);
+  res.json(publicProfile(updated!));
 });
 
 export default router;

@@ -30,9 +30,8 @@ export interface Profile {
   /** @nullable */
   summary?: string | null;
   /** @nullable */
-  resumeObjectPath?: string | null;
-  /** @nullable */
   resumeFileName?: string | null;
+  hasResume?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,13 +122,26 @@ export const CreateApplicationBodySourceType = {
   text: "text",
 } as const;
 
+/**
+ * preview = parse only, then user clicks Generate. auto = parse + draft + auto-send when gates pass.
+ */
+export type CreateApplicationBodyMode =
+  (typeof CreateApplicationBodyMode)[keyof typeof CreateApplicationBodyMode];
+
+export const CreateApplicationBodyMode = {
+  preview: "preview",
+  auto: "auto",
+} as const;
+
 export interface CreateApplicationBody {
   sourceType: CreateApplicationBodySourceType;
   /** @nullable */
   sourceUrl?: string | null;
   /** @nullable */
   sourceText?: string | null;
-  autoProcess?: boolean;
+  /** preview = parse only, then user clicks Generate. auto = parse + draft + auto-send when gates pass. */
+  mode?: CreateApplicationBodyMode;
+  /** Only honored when mode=auto. If true, sends when validation passes. */
   autoSend?: boolean;
 }
 

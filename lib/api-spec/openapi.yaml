@@ -176,6 +176,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /applications/{id}/draft:
+    post:
+      operationId: draftApplication
+      tags: [applications]
+      summary: Draft the cover letter (assumes the job has already been parsed)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Drafted application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /applications/{id}/letter:
     patch:
       operationId: updateApplicationLetter
@@ -383,10 +408,10 @@ components:
           type: ["string", "null"]
         summary:
           type: ["string", "null"]
-        resumeObjectPath:
-          type: ["string", "null"]
         resumeFileName:
           type: ["string", "null"]
+        hasResume:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -517,12 +542,15 @@ components:
           type: ["string", "null"]
         sourceText:
           type: ["string", "null"]
-        autoProcess:
-          type: boolean
-          default: true
+        mode:
+          type: string
+          enum: [preview, auto]
+          default: preview
+          description: "preview = parse only, then user clicks Generate. auto = parse + draft + auto-send when gates pass."
         autoSend:
           type: boolean
           default: true
+          description: "Only honored when mode=auto. If true, sends when validation passes."
 
     UpdateLetterBody:
       type: object

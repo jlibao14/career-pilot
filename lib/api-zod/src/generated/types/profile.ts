@@ -23,9 +23,8 @@ export interface Profile {
   /** @nullable */
   summary?: string | null;
   /** @nullable */
-  resumeObjectPath?: string | null;
-  /** @nullable */
   resumeFileName?: string | null;
+  hasResume?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

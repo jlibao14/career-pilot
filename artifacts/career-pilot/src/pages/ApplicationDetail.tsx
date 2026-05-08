@@ -8,6 +8,7 @@ import {
   useSendApplication,
   useDeleteApplication,
   useProcessApplication,
+  useDraftApplication,
   getGetApplicationQueryKey,
   getListApplicationsQueryKey,
   getGetDashboardSummaryQueryKey,
@@ -19,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowLeft, CheckCircle2, XCircle, Send, Trash2, RefreshCw, MapPin, Building2, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Send, Trash2, RefreshCw, MapPin, Building2, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -48,6 +49,7 @@ export default function ApplicationDetail() {
   const sendApp = useSendApplication();
   const deleteApp = useDeleteApplication();
   const reprocess = useProcessApplication();
+  const draft = useDraftApplication();
 
   const [letterDraft, setLetterDraft] = useState("");
   const [subjectDraft, setSubjectDraft] = useState("");
@@ -142,6 +144,18 @@ export default function ApplicationDetail() {
 
   const isProcessing = ["parsing", "drafting", "validating", "sending"].includes(app.status);
   const validationPassed = app.validation?.passed ?? false;
+  const hasLetter = !!app.coverLetter;
+  const hasParsedJob = !!(app.company && app.roleTitle);
+
+  const generate = async () => {
+    try {
+      await draft.mutateAsync({ id });
+      invalidate();
+      toast.success("Cover letter drafted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to draft");
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -247,14 +261,31 @@ export default function ApplicationDetail() {
                     {letterDraft.split(/\s+/).filter(Boolean).length} words
                   </span>
                 </div>
-                <Textarea
-                  value={letterDraft}
-                  onChange={(e) => setLetterDraft(e.target.value)}
-                  rows={18}
-                  className="font-serif text-base leading-relaxed"
-                  placeholder="The drafted letter will appear here once processing completes."
-                  data-testid="textarea-letter"
-                />
+                {!hasLetter && hasParsedJob && !isProcessing ? (
+                  <div className="border border-dashed border-border rounded-md p-8 text-center">
+                    <Sparkles className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+                    <div className="font-medium">Ready to draft</div>
+                    <p className="text-sm text-muted-foreground mt-1 mb-4">
+                      Review the parsed details on the right, then generate a tailored letter.
+                    </p>
+                    <Button onClick={generate} disabled={draft.isPending} data-testid="button-generate">
+                      {draft.isPending ? (
+                        <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Drafting…</>
+                      ) : (
+                        <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate cover letter</>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Textarea
+                    value={letterDraft}
+                    onChange={(e) => setLetterDraft(e.target.value)}
+                    rows={18}
+                    className="font-serif text-base leading-relaxed"
+                    placeholder="The drafted letter will appear here once processing completes."
+                    data-testid="textarea-letter"
+                  />
+                )}
               </div>
 
               <div>
@@ -268,12 +299,14 @@ export default function ApplicationDetail() {
                 />
               </div>
 
-              <div className="flex justify-end">
-                <Button onClick={saveLetter} disabled={updateLetter.isPending} variant="outline" data-testid="button-save-letter">
-                  {updateLetter.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-                  Save changes
-                </Button>
-              </div>
+              {hasLetter && (
+                <div className="flex justify-end">
+                  <Button onClick={saveLetter} disabled={updateLetter.isPending} variant="outline" data-testid="button-save-letter">
+                    {updateLetter.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                    Save changes
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -304,7 +337,7 @@ export default function ApplicationDetail() {
 
               <Button
                 onClick={send}
-                disabled={sendApp.isPending || isProcessing}
+                disabled={sendApp.isPending || isProcessing || !hasLetter}
                 size="lg"
                 className="w-full"
                 data-testid="button-send"

@@ -5,6 +5,7 @@
  * Career Pilot API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateApplicationBodyMode } from "./createApplicationBodyMode";
 import type { CreateApplicationBodySourceType } from "./createApplicationBodySourceType";
 
 export interface CreateApplicationBody {
@@ -13,6 +14,8 @@ export interface CreateApplicationBody {
   sourceUrl?: string | null;
   /** @nullable */
   sourceText?: string | null;
-  autoProcess?: boolean;
+  /** preview = parse only, then user clicks Generate. auto = parse + draft + auto-send when gates pass. */
+  mode?: CreateApplicationBodyMode;
+  /** Only honored when mode=auto. If true, sends when validation passes. */
   autoSend?: boolean;
 }
