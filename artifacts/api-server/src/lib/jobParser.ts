@@ -115,12 +115,12 @@ export async function fetchJobFromUrl(rawUrl: string): Promise<string> {
       const { value, done } = await reader.read();
       if (done) break;
       if (value) {
-        total += value.byteLength;
-        if (total > MAX_BYTES) {
+        if (total + value.byteLength > MAX_BYTES) {
           await reader.cancel();
           break;
         }
         chunks.push(value);
+        total += value.byteLength;
       }
     }
     const merged = new Uint8Array(total);
