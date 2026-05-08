@@ -495,10 +495,3 @@ export const RequestUploadUrlResponse = zod.object({
 export const GetPublicObjectParams = zod.object({
   filePath: zod.coerce.string(),
 });
-
-/**
- * @summary Serve a private object
- */
-export const GetStorageObjectParams = zod.object({
-  objectPath: zod.coerce.string(),
-});
