@@ -30,6 +30,10 @@ export interface Profile {
   /** @nullable */
   summary?: string | null;
   /** @nullable */
+  preferredTone?: string | null;
+  /** @nullable */
+  keyAchievements?: string | null;
+  /** @nullable */
   resumeFileName?: string | null;
   hasResume?: boolean;
   createdAt: string;
@@ -53,6 +57,10 @@ export interface UpdateProfileBody {
   headline?: string | null;
   /** @nullable */
   summary?: string | null;
+  /** @nullable */
+  preferredTone?: string | null;
+  /** @nullable */
+  keyAchievements?: string | null;
 }
 
 export interface SetResumeBody {

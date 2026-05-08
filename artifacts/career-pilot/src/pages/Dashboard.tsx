@@ -4,8 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowRight, FilePlus2, MailCheck, AlertCircle, FileText, XCircle } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { ArrowRight, FilePlus2, MailCheck, AlertCircle, FileText, XCircle, CheckCircle2 } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
 
 export default function Dashboard() {
   const { data: summary, isLoading: summaryLoading } = useGetDashboardSummary();
@@ -87,13 +87,33 @@ export default function Dashboard() {
                           </div>
                           <StatusBadge status={app.status} />
                         </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {app.company || "Unknown company"}
-                          {app.recipientEmail ? <> · <span className="font-mono text-xs">{app.recipientEmail}</span></> : null}
+                        <div className="text-sm text-muted-foreground truncate flex items-center gap-2">
+                          <span className="truncate">
+                            {app.company || "Unknown company"}
+                            {app.recipientEmail ? <> · <span className="font-mono text-xs">{app.recipientEmail}</span></> : null}
+                          </span>
+                          {app.validation && (
+                            app.validation.passed ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-700 shrink-0" title="Validation passed">
+                                <CheckCircle2 className="w-3 h-3" /> gate ok
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-700 shrink-0" title="Validation issues">
+                                <AlertCircle className="w-3 h-3" /> {app.validation.checks.filter((c) => !c.passed).length} issues
+                              </span>
+                            )
+                          )}
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDistanceToNow(new Date(app.createdAt), { addSuffix: true })}
+                      <div className="text-xs text-muted-foreground whitespace-nowrap text-right">
+                        {app.sentAt ? (
+                          <>
+                            <div className="text-emerald-700 font-medium">Sent</div>
+                            <div>{format(new Date(app.sentAt), "MMM d")}</div>
+                          </>
+                        ) : (
+                          formatDistanceToNow(new Date(app.createdAt), { addSuffix: true })
+                        )}
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
                     </Link>

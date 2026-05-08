@@ -383,6 +383,10 @@ components:
           type: ["string", "null"]
         summary:
           type: ["string", "null"]
+        preferredTone:
+          type: ["string", "null"]
+        keyAchievements:
+          type: ["string", "null"]
         resumeFileName:
           type: ["string", "null"]
         hasResume:
@@ -415,6 +419,10 @@ components:
         headline:
           type: ["string", "null"]
         summary:
+          type: ["string", "null"]
+        preferredTone:
+          type: ["string", "null"]
+        keyAchievements:
           type: ["string", "null"]
 
     SetResumeBody:
