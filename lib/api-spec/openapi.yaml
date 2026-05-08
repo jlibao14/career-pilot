@@ -553,6 +553,10 @@ components:
           minLength: 1
         recipientName:
           type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        roleTitle:
+          type: ["string", "null"]
 
     DashboardSummary:
       type: object

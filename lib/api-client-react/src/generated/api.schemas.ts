@@ -164,6 +164,10 @@ export interface UpdateRecipientBody {
   recipientEmail: string;
   /** @nullable */
   recipientName?: string | null;
+  /** @nullable */
+  company?: string | null;
+  /** @nullable */
+  roleTitle?: string | null;
 }
 
 export interface DashboardSummary {
