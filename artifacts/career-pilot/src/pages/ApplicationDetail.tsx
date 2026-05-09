@@ -64,6 +64,7 @@ export default function ApplicationDetail() {
   const commitAutoCorrect = useCommitAutoCorrect();
   const [autoFixPreview, setAutoFixPreview] = useState<AutoCorrectResult | null>(null);
   const [autoFixOpen, setAutoFixOpen] = useState(false);
+  const [autoFixedJustNow, setAutoFixedJustNow] = useState(false);
 
   const [letterDraft, setLetterDraft] = useState("");
   const [subjectDraft, setSubjectDraft] = useState("");
@@ -229,6 +230,8 @@ export default function ApplicationDetail() {
 
       setAutoFixOpen(false);
       setAutoFixPreview(null);
+      setAutoFixedJustNow(true);
+      window.setTimeout(() => setAutoFixedJustNow(false), 6000);
       invalidate();
       if (stillFailing.length === 0) {
         toast.success(
@@ -468,7 +471,11 @@ export default function ApplicationDetail() {
                   Validation gate {validationPassed && <CheckCircle2 className="inline w-3.5 h-3.5 text-emerald-700 ml-1" />}
                 </h3>
               </div>
-              {app.autoCorrectedAt && (
+              {autoFixedJustNow ? (
+                <p className="text-xs text-emerald-700 mb-3" data-testid="text-auto-fix-history">
+                  Auto-fixed · just now
+                </p>
+              ) : app.autoCorrectedAt && (
                 <p className="text-xs text-muted-foreground mb-3" data-testid="text-auto-fix-history">
                   Auto-fixed {app.autoCorrectCount} time{app.autoCorrectCount === 1 ? "" : "s"} · last {format(new Date(app.autoCorrectedAt), "MMM d")}
                 </p>
