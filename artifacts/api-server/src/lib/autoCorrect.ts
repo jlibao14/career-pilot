@@ -46,6 +46,93 @@ function paragraphsOf(text: string): string[] {
     .filter((p) => p.length > 0);
 }
 
+function wordCount(s: string): number {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+const SIGNOFF_LINE_RE = /^(best regards|kind regards|sincerely|regards|best|warm regards|thank you|thanks|respectfully|cordially)[,.\s]*$/i;
+
+// A bare-name line: 1-5 words, no terminal punctuation, mostly Capitalized.
+function looksLikeName(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/[.!?]$/.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  if (words.length < 1 || words.length > 5) return false;
+  const capCount = words.filter((w) => /^[A-Z][a-zA-Z'’-]*$/.test(w)).length;
+  return capCount >= Math.ceil(words.length / 2);
+}
+
+// True iff a paragraph is purely a sign-off block: a sign-off phrase line,
+// optionally followed by a name-like line. Generic "short paragraph" is NOT
+// enough — that risks collapsing a real short body paragraph.
+function isSignoffParagraph(p: string): boolean {
+  const lines = p.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0 || lines.length > 2) return false;
+  if (SIGNOFF_LINE_RE.test(lines[0]!)) {
+    return lines.length === 1 || looksLikeName(lines[1]!);
+  }
+  // Single bare name on its own (paired with a previous sign-off paragraph).
+  return lines.length === 1 && looksLikeName(lines[0]!);
+}
+
+// Collapse a trailing sign-off block (e.g. "Best regards," and the candidate
+// name each emitted as their own paragraph) back into the prior paragraph.
+// The model frequently does this even when prompted not to.
+//
+// Safety: never reduces paragraph count below MIN_PARAS, and only merges
+// paragraphs that actually look like a sign-off / bare-name tail.
+function collapseSignoffBlock(text: string): string {
+  let paras = paragraphsOf(text);
+  while (paras.length > MIN_PARAS) {
+    const last = paras[paras.length - 1]!;
+    if (!isSignoffParagraph(last)) break;
+    const prev = paras[paras.length - 2]!;
+    paras = paras.slice(0, -2).concat([`${prev}\n${last}`]);
+  }
+  return paras.join("\n\n");
+}
+
+// If still over the paragraph limit, merge each short stub into a neighbour
+// (preferring the previous paragraph) until the count is in range or no
+// further mechanical merges are safe.
+function mergeShortStubs(text: string): string {
+  const STUB_THRESHOLD = 20;
+  let paras = paragraphsOf(text);
+  while (paras.length > MAX_PARAS) {
+    const counts = paras.map(wordCount);
+    // Find the smallest paragraph below the stub threshold.
+    let idx = -1;
+    let smallest = Infinity;
+    for (let i = 0; i < paras.length; i++) {
+      const c = counts[i]!;
+      if (c < STUB_THRESHOLD && c < smallest) {
+        smallest = c;
+        idx = i;
+      }
+    }
+    if (idx === -1) break;
+    // Merge into previous if possible, otherwise into next.
+    if (idx > 0) {
+      paras = [
+        ...paras.slice(0, idx - 1),
+        `${paras[idx - 1]} ${paras[idx]}`,
+        ...paras.slice(idx + 1),
+      ];
+    } else {
+      paras = [
+        `${paras[0]} ${paras[1]}`,
+        ...paras.slice(2),
+      ];
+    }
+  }
+  return paras.join("\n\n");
+}
+
+export function normalizeLetter(text: string): string {
+  return mergeShortStubs(collapseSignoffBlock(text));
+}
+
 export interface AutoCorrectValidation {
   ok: boolean;
   issues: string[];
@@ -150,8 +237,9 @@ async function callLLM(system: string, user: string): Promise<{ coverLetter: str
     summary?: unknown;
   }>({ system, user, maxTokens: 2000 });
 
+  const rawLetter = (result.coverLetter ?? "").trim();
   return {
-    coverLetter: (result.coverLetter ?? "").trim(),
+    coverLetter: normalizeLetter(rawLetter),
     emailSubject: (result.emailSubject ?? "").trim(),
     summary: Array.isArray(result.summary)
       ? result.summary.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
@@ -164,6 +252,8 @@ export interface AutoCorrectAttemptOutcome {
   validation: AutoCorrectValidation;
 }
 
+const MAX_RETRIES = 2;
+
 export async function autoCorrectLetter(input: AutoCorrectInput): Promise<AutoCorrectAttemptOutcome> {
   const targeted = input.failedCheckIds.filter((id) =>
     (AUTO_CORRECTABLE_CHECK_IDS as readonly string[]).includes(id),
@@ -171,12 +261,10 @@ export async function autoCorrectLetter(input: AutoCorrectInput): Promise<AutoCo
 
   const system = buildSystemPrompt();
 
-  // First attempt
   let attempt = await callLLM(system, buildUserPrompt(input, targeted));
   let validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
 
-  // One retry, feeding the issue list back in
-  if (!validation.ok) {
+  for (let i = 0; i < MAX_RETRIES && !validation.ok; i++) {
     attempt = await callLLM(system, buildUserPrompt(input, targeted, validation.issues));
     validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
   }
