@@ -118,6 +118,9 @@ export interface Application {
   errorMessage?: string | null;
   /** @nullable */
   agentmailMessageId?: string | null;
+  autoCorrectCount?: number;
+  /** @nullable */
+  autoCorrectedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +154,19 @@ export interface CreateApplicationBody {
   mode?: CreateApplicationBodyMode;
   /** Only honored when mode=auto. If true, sends when validation passes. */
   autoSend?: boolean;
+}
+
+export interface AutoCorrectResult {
+  coverLetter: string;
+  emailSubject: string;
+  summary: string[];
+  targetedCheckIds: string[];
+}
+
+export interface AutoCorrectFailure {
+  error: string;
+  issues: string[];
+  result?: AutoCorrectResult;
 }
 
 export interface UpdateLetterBody {

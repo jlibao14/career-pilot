@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 
 export const applicationsTable = pgTable("applications", {
   id: serial("id").primaryKey(),
@@ -23,6 +23,8 @@ export const applicationsTable = pgTable("applications", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
   errorMessage: text("error_message"),
   agentmailMessageId: text("agentmail_message_id"),
+  autoCorrectCount: integer("auto_correct_count").notNull().default(0),
+  autoCorrectedAt: timestamp("auto_corrected_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

@@ -42,6 +42,9 @@ export interface Application {
   errorMessage?: string | null;
   /** @nullable */
   agentmailMessageId?: string | null;
+  autoCorrectCount?: number;
+  /** @nullable */
+  autoCorrectedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -18,6 +18,8 @@ import type {
 
 import type {
   Application,
+  AutoCorrectFailure,
+  AutoCorrectResult,
   CreateApplicationBody,
   DashboardSummary,
   ErrorEnvelope,
@@ -1033,6 +1035,176 @@ export const useUpdateApplicationRecipient = <
   TContext
 > => {
   return useMutation(getUpdateApplicationRecipientMutationOptions(options));
+};
+
+/**
+ * @summary Run an LLM auto-fix on the cover letter + subject WITHOUT persisting
+ */
+export const getAutoCorrectApplicationUrl = (id: number) => {
+  return `/api/applications/${id}/auto-correct`;
+};
+
+export const autoCorrectApplication = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AutoCorrectResult> => {
+  return customFetch<AutoCorrectResult>(getAutoCorrectApplicationUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAutoCorrectApplicationMutationOptions = <
+  TError = ErrorType<ErrorEnvelope | AutoCorrectFailure>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof autoCorrectApplication>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof autoCorrectApplication>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["autoCorrectApplication"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof autoCorrectApplication>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return autoCorrectApplication(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AutoCorrectApplicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof autoCorrectApplication>>
+>;
+
+export type AutoCorrectApplicationMutationError = ErrorType<
+  ErrorEnvelope | AutoCorrectFailure
+>;
+
+/**
+ * @summary Run an LLM auto-fix on the cover letter + subject WITHOUT persisting
+ */
+export const useAutoCorrectApplication = <
+  TError = ErrorType<ErrorEnvelope | AutoCorrectFailure>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof autoCorrectApplication>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof autoCorrectApplication>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAutoCorrectApplicationMutationOptions(options));
+};
+
+/**
+ * @summary Increment the auto-fix counter and timestamp after the user accepts a preview
+ */
+export const getCommitAutoCorrectUrl = (id: number) => {
+  return `/api/applications/${id}/auto-correct/commit`;
+};
+
+export const commitAutoCorrect = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Application> => {
+  return customFetch<Application>(getCommitAutoCorrectUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCommitAutoCorrectMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof commitAutoCorrect>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof commitAutoCorrect>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["commitAutoCorrect"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof commitAutoCorrect>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return commitAutoCorrect(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CommitAutoCorrectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof commitAutoCorrect>>
+>;
+
+export type CommitAutoCorrectMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Increment the auto-fix counter and timestamp after the user accepts a preview
+ */
+export const useCommitAutoCorrect = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof commitAutoCorrect>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof commitAutoCorrect>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCommitAutoCorrectMutationOptions(options));
 };
 
 /**

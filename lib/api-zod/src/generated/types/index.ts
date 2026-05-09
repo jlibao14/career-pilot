@@ -7,6 +7,8 @@
  */
 
 export * from "./application";
+export * from "./autoCorrectFailure";
+export * from "./autoCorrectResult";
 export * from "./createApplicationBody";
 export * from "./createApplicationBodyMode";
 export * from "./createApplicationBodySourceType";

@@ -251,6 +251,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/Application"
 
+  /applications/{id}/auto-correct:
+    post:
+      operationId: autoCorrectApplication
+      tags: [applications]
+      summary: Run an LLM auto-fix on the cover letter + subject WITHOUT persisting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Auto-fix preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoCorrectResult"
+        "400":
+          description: Nothing to auto-fix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Auto-fix output still fails validation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoCorrectFailure"
+
+  /applications/{id}/auto-correct/commit:
+    post:
+      operationId: commitAutoCorrect
+      tags: [applications]
+      summary: Increment the auto-fix counter and timestamp after the user accepts a preview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
   /applications/{id}/send:
     post:
       operationId: sendApplication
@@ -483,6 +533,11 @@ components:
           type: ["string", "null"]
         agentmailMessageId:
           type: ["string", "null"]
+        autoCorrectCount:
+          type: integer
+        autoCorrectedAt:
+          type: ["string", "null"]
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -534,6 +589,36 @@ components:
           type: boolean
           default: true
           description: "Only honored when mode=auto. If true, sends when validation passes."
+
+    AutoCorrectResult:
+      type: object
+      required: [coverLetter, emailSubject, summary, targetedCheckIds]
+      properties:
+        coverLetter:
+          type: string
+        emailSubject:
+          type: string
+        summary:
+          type: array
+          items:
+            type: string
+        targetedCheckIds:
+          type: array
+          items:
+            type: string
+
+    AutoCorrectFailure:
+      type: object
+      required: [error, issues]
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+        result:
+          $ref: "#/components/schemas/AutoCorrectResult"
 
     UpdateLetterBody:
       type: object

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db, applicationsTable, profileTable } from "@workspace/db";
 import {
   CreateApplicationBody,
@@ -9,6 +9,11 @@ import {
 import { fetchJobFromUrl, parseJob } from "../lib/jobParser";
 import { draftCoverLetter } from "../lib/letterWriter";
 import { validateApplication } from "../lib/validator";
+import {
+  autoCorrectLetter,
+  validateAutoCorrectOutput,
+  AUTO_CORRECTABLE_CHECK_IDS,
+} from "../lib/autoCorrect";
 import { sendEmail } from "../lib/agentMail";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -270,6 +275,85 @@ router.patch("/applications/:id/recipient", async (req, res): Promise<void> => {
     .where(eq(applicationsTable.id, id))
     .returning();
   res.json(revalidated);
+});
+
+router.post("/applications/:id/auto-correct", async (req, res): Promise<void> => {
+  const id = parseId(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const [app] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id));
+  if (!app) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!app.coverLetter || !app.coverLetter.trim()) {
+    res.status(400).json({ error: "No cover letter to auto-fix yet." });
+    return;
+  }
+  const failedAutoCheckIds = (app.validation?.checks ?? [])
+    .filter((c) => !c.passed && (AUTO_CORRECTABLE_CHECK_IDS as readonly string[]).includes(c.id))
+    .map((c) => c.id);
+  if (failedAutoCheckIds.length === 0) {
+    res.status(400).json({ error: "Nothing to auto-fix — no auto-correctable checks are failing." });
+    return;
+  }
+  const [profile] = await db.select().from(profileTable).limit(1);
+  if (!profile) {
+    res.status(400).json({ error: "Profile not configured" });
+    return;
+  }
+
+  try {
+    const result = await autoCorrectLetter({
+      profile,
+      coverLetter: app.coverLetter,
+      emailSubject: app.emailSubject,
+      company: app.company,
+      roleTitle: app.roleTitle,
+      recipientName: app.recipientName,
+      jobSummary: app.jobSummary,
+      keyRequirements: app.keyRequirements ?? [],
+      failedCheckIds: failedAutoCheckIds,
+    });
+
+    const validation = validateAutoCorrectOutput(result.coverLetter, result.emailSubject);
+    if (!validation.ok) {
+      res.status(422).json({
+        error: "Auto-fix produced output that still fails validation.",
+        issues: validation.issues,
+        result,
+      });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Auto-correct failed");
+    const message = err instanceof Error ? err.message : "Auto-correct failed";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/applications/:id/auto-correct/commit", async (req, res): Promise<void> => {
+  const id = parseId(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const [row] = await db
+    .update(applicationsTable)
+    .set({
+      autoCorrectCount: sql`${applicationsTable.autoCorrectCount} + 1`,
+      autoCorrectedAt: new Date(),
+    })
+    .where(eq(applicationsTable.id, id))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(row);
 });
 
 router.post("/applications/:id/send", async (req, res): Promise<void> => {

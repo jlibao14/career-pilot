@@ -136,6 +136,8 @@ export const ListApplicationsResponseItem = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -208,6 +210,8 @@ export const GetApplicationResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -262,6 +266,8 @@ export const ProcessApplicationResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -309,6 +315,8 @@ export const DraftApplicationResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -361,6 +369,8 @@ export const UpdateApplicationLetterResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -415,6 +425,71 @@ export const UpdateApplicationRecipientResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Run an LLM auto-fix on the cover letter + subject WITHOUT persisting
+ */
+export const AutoCorrectApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AutoCorrectApplicationResponse = zod.object({
+  coverLetter: zod.string(),
+  emailSubject: zod.string(),
+  summary: zod.array(zod.string()),
+  targetedCheckIds: zod.array(zod.string()),
+});
+
+/**
+ * @summary Increment the auto-fix counter and timestamp after the user accepts a preview
+ */
+export const CommitAutoCorrectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CommitAutoCorrectResponse = zod.object({
+  id: zod.number(),
+  status: zod
+    .string()
+    .describe(
+      "draft | parsing | drafting | validating | ready | needs_review | sending | sent | failed",
+    ),
+  sourceType: zod.string().describe("url | text"),
+  sourceUrl: zod.string().nullish(),
+  sourceText: zod.string().nullish(),
+  company: zod.string().nullish(),
+  roleTitle: zod.string().nullish(),
+  location: zod.string().nullish(),
+  recipientEmail: zod.string().nullish(),
+  recipientName: zod.string().nullish(),
+  jobSummary: zod.string().nullish(),
+  keyRequirements: zod.array(zod.string()).optional(),
+  coverLetter: zod.string().nullish(),
+  emailSubject: zod.string().nullish(),
+  validation: zod
+    .object({
+      passed: zod.boolean(),
+      checks: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+          passed: zod.boolean(),
+          detail: zod.string().nullish(),
+        }),
+      ),
+    })
+    .optional(),
+  autoSent: zod.boolean().optional(),
+  sentAt: zod.coerce.date().nullish(),
+  errorMessage: zod.string().nullish(),
+  agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -462,6 +537,8 @@ export const SendApplicationResponse = zod.object({
   sentAt: zod.coerce.date().nullish(),
   errorMessage: zod.string().nullish(),
   agentmailMessageId: zod.string().nullish(),
+  autoCorrectCount: zod.number().optional(),
+  autoCorrectedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
