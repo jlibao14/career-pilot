@@ -93,40 +93,56 @@ function collapseSignoffBlock(text: string): string {
   return paras.join("\n\n");
 }
 
-// If still over the paragraph limit, merge each short stub into a neighbour
-// (preferring the previous paragraph) until the count is in range or no
-// further mechanical merges are safe.
+// If still over the paragraph limit, merge each short stub into an adjacent
+// non-stub paragraph (preferring the previous one). Only stubs adjacent to a
+// longer-than-threshold paragraph are merged, so we don't collapse a run of
+// equally-short paragraphs unsafely.
 function mergeShortStubs(text: string): string {
   const STUB_THRESHOLD = 20;
   let paras = paragraphsOf(text);
   while (paras.length > MAX_PARAS) {
     const counts = paras.map(wordCount);
-    // Find the smallest paragraph below the stub threshold.
     let idx = -1;
     let smallest = Infinity;
     for (let i = 0; i < paras.length; i++) {
       const c = counts[i]!;
-      if (c < STUB_THRESHOLD && c < smallest) {
+      if (c >= STUB_THRESHOLD) continue;
+      const prevLong = i > 0 && counts[i - 1]! >= STUB_THRESHOLD;
+      const nextLong = i < paras.length - 1 && counts[i + 1]! >= STUB_THRESHOLD;
+      if (!prevLong && !nextLong) continue;
+      if (c < smallest) {
         smallest = c;
         idx = i;
       }
     }
     if (idx === -1) break;
-    // Merge into previous if possible, otherwise into next.
-    if (idx > 0) {
+    const prevLong = idx > 0 && counts[idx - 1]! >= STUB_THRESHOLD;
+    if (prevLong) {
       paras = [
         ...paras.slice(0, idx - 1),
         `${paras[idx - 1]} ${paras[idx]}`,
         ...paras.slice(idx + 1),
       ];
     } else {
+      // adjacent next is the long one
       paras = [
-        `${paras[0]} ${paras[1]}`,
-        ...paras.slice(2),
+        ...paras.slice(0, idx),
+        `${paras[idx]} ${paras[idx + 1]}`,
+        ...paras.slice(idx + 2),
       ];
     }
   }
   return paras.join("\n\n");
+}
+
+// True iff a validation failure list contains issues that another LLM attempt
+// could plausibly fix (structure / placeholders / subject). Word-count is
+// included because the model can re-pad on retry — but pure word-count misses
+// after a retry are unlikely to flip without further prompting changes.
+function hasRetryableIssues(issues: string[]): boolean {
+  return issues.some((i) =>
+    /paragraph|placeholder|subject|words \(need/i.test(i),
+  );
 }
 
 export function normalizeLetter(text: string): string {
@@ -264,7 +280,9 @@ export async function autoCorrectLetter(input: AutoCorrectInput): Promise<AutoCo
   let attempt = await callLLM(system, buildUserPrompt(input, targeted));
   let validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
 
-  for (let i = 0; i < MAX_RETRIES && !validation.ok; i++) {
+  // Only retry on issues another LLM pass can plausibly fix (structure,
+  // placeholders, subject, length). Avoids burning calls on dead-end failures.
+  for (let i = 0; i < MAX_RETRIES && !validation.ok && hasRetryableIssues(validation.issues); i++) {
     attempt = await callLLM(system, buildUserPrompt(input, targeted, validation.issues));
     validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
   }
