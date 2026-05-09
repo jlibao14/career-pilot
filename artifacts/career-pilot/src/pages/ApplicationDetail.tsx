@@ -197,7 +197,14 @@ export default function ApplicationDetail() {
       setAutoFixPreview(preview);
       setAutoFixOpen(true);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Auto-fix failed";
+      let msg = err instanceof Error ? err.message : "Auto-fix failed";
+      const anyErr = err as { status?: number; data?: { error?: string; issues?: string[] } };
+      if (anyErr?.status === 422 && anyErr.data) {
+        const issues = anyErr.data.issues ?? [];
+        msg = issues.length > 0
+          ? `Auto-fix couldn't produce a valid rewrite: ${issues.join("; ")}`
+          : (anyErr.data.error ?? msg);
+      }
       toast.error(msg);
     }
   };
