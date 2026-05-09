@@ -135,14 +135,12 @@ function mergeShortStubs(text: string): string {
   return paras.join("\n\n");
 }
 
-// True iff a validation failure list contains issues that another LLM attempt
-// could plausibly fix (structure / placeholders / subject). Word-count is
-// included because the model can re-pad on retry — but pure word-count misses
-// after a retry are unlikely to flip without further prompting changes.
+// True iff a validation failure list contains structural issues another LLM
+// attempt could plausibly fix (paragraph count/shape, word-count length).
+// Other failures (placeholder/subject) are unlikely to flip on a re-prompt
+// without different inputs, so we don't burn calls on them.
 function hasRetryableIssues(issues: string[]): boolean {
-  return issues.some((i) =>
-    /paragraph|placeholder|subject|words \(need/i.test(i),
-  );
+  return issues.some((i) => /paragraph|words \(need/i.test(i));
 }
 
 export function normalizeLetter(text: string): string {
