@@ -30,6 +30,15 @@ export const AUTO_CORRECTABLE_CHECK_IDS = [
 
 const PLACEHOLDER_RE = /\[[^\]]+\]|\bTBD\b|INSERT_|\{\{[^}]+\}\}/i;
 
+// Acceptance bounds — must match the real Validation Gate in validator.ts.
+const MIN_WORDS = 180;
+const MAX_WORDS = 320;
+const MIN_PARAS = 3;
+const MAX_PARAS = 4;
+const MIN_PARA_WORDS = 35;
+const MAX_PARA_WORDS = 160;
+const MAX_SUBJECT_LEN = 120;
+
 function paragraphsOf(text: string): string[] {
   return text
     .split(/\n\s*\n+/)
@@ -48,16 +57,16 @@ export function validateAutoCorrectOutput(
 ): AutoCorrectValidation {
   const issues: string[] = [];
   const wordCount = coverLetter.trim().split(/\s+/).filter(Boolean).length;
-  if (wordCount < 200 || wordCount > 280) {
-    issues.push(`Rewrite is ${wordCount} words (need 200-280).`);
+  if (wordCount < MIN_WORDS || wordCount > MAX_WORDS) {
+    issues.push(`Rewrite is ${wordCount} words (need ${MIN_WORDS}-${MAX_WORDS}).`);
   }
   const paras = paragraphsOf(coverLetter);
-  if (paras.length !== 3) {
-    issues.push(`Rewrite has ${paras.length} paragraphs (need exactly 3).`);
+  if (paras.length < MIN_PARAS || paras.length > MAX_PARAS) {
+    issues.push(`Rewrite has ${paras.length} paragraphs (need ${MIN_PARAS}-${MAX_PARAS}).`);
   } else {
     const counts = paras.map((p) => p.split(/\s+/).filter(Boolean).length);
-    const tooShort = counts.find((c) => c < 35);
-    const tooLong = counts.find((c) => c > 160);
+    const tooShort = counts.find((c) => c < MIN_PARA_WORDS);
+    const tooLong = counts.find((c) => c > MAX_PARA_WORDS);
     if (tooShort !== undefined) issues.push(`Paragraph too short (${tooShort} words).`);
     if (tooLong !== undefined) issues.push(`Paragraph too long (${tooLong} words).`);
   }
@@ -66,31 +75,33 @@ export function validateAutoCorrectOutput(
   }
   const subj = emailSubject.trim();
   if (subj.length === 0) issues.push("Subject is empty.");
-  if (subj.length > 120) issues.push("Subject exceeds 120 chars.");
+  if (subj.length > MAX_SUBJECT_LEN) issues.push(`Subject exceeds ${MAX_SUBJECT_LEN} chars.`);
   if (PLACEHOLDER_RE.test(subj)) issues.push("Subject contains a placeholder.");
   return { ok: issues.length === 0, issues };
 }
 
-export async function autoCorrectLetter(input: AutoCorrectInput): Promise<AutoCorrectResult> {
-  const targeted = input.failedCheckIds.filter((id) =>
-    (AUTO_CORRECTABLE_CHECK_IDS as readonly string[]).includes(id),
-  );
-
-  const system = `You are a senior career strategist revising an existing executive-tone cover letter.
+function buildSystemPrompt(): string {
+  return `You are a senior career strategist revising an existing executive-tone cover letter.
 
 Rules:
 - Output a fully rewritten letter that fixes the listed validation failures while preserving the candidate's voice and the concrete facts (companies, metrics, dates, names) from the original. Never invent new metrics or employers.
-- Length: exactly 200-280 words, exactly 3 paragraphs separated by a single blank line. Each paragraph 35-160 words.
+- Aim for 220-260 words, in 3 paragraphs separated by a single blank line. The rewrite MUST be between ${MIN_WORDS} and ${MAX_WORDS} words and have ${MIN_PARAS} or ${MAX_PARAS} paragraphs total. Each paragraph must be ${MIN_PARA_WORDS}-${MAX_PARA_WORDS} words.
 - Paragraph 1: hook tying the candidate's strongest credential to the role.
-- Paragraph 2: 2-3 concrete, quantified proof points relevant to the posting.
-- Paragraph 3: forward-looking close + clear next step.
+- Paragraph 2: 2-3 concrete, quantified proof points relevant to the posting (you may split this across two paragraphs if it reads better, giving 4 paragraphs total).
+- Final paragraph: forward-looking close + clear next step.
 - No buzzwords, no clichés, no exclamation marks.
 - Replace any placeholder tokens like [Company], [Role], {{name}}, TBD, INSERT_X with concrete values from the job + profile context. If the recipient name is unknown, open with "Dear Hiring Team,".
-- Sign off with "Best regards," followed by the candidate's full name on a new line.
-- Subject: ≤120 chars, format "Application: <Role> — <Candidate Name>", no placeholders.
+- Sign off with "Best regards," followed by the candidate's full name on a new line. The sign-off and name belong to the final paragraph block — do NOT split them onto a separate paragraph (a blank line before "Best regards," would create an extra paragraph and fail validation).
+- Subject: ≤${MAX_SUBJECT_LEN} chars, format "Application: <Role> — <Candidate Name>", no placeholders.
 - Plain prose only — no markdown, bullets, or headings.`;
+}
 
-  const user = `Candidate:
+function buildUserPrompt(input: AutoCorrectInput, targeted: string[], retryFeedback?: string[]): string {
+  const retryBlock = retryFeedback && retryFeedback.length > 0
+    ? `\n\nYour previous attempt failed these structural checks — fix them this time:\n${retryFeedback.map((i) => `- ${i}`).join("\n")}`
+    : "";
+
+  return `Candidate:
 - Name: ${input.profile.fullName || "(unknown)"}
 - Headline: ${input.profile.headline ?? "(none)"}
 - Preferred tone: ${input.profile.preferredTone ?? "(default executive)"}
@@ -120,7 +131,7 @@ Current letter:
 ${input.coverLetter}
 """
 
-Failed checks to fix: ${targeted.join(", ") || "(none)"}
+Failed checks to fix: ${targeted.join(", ") || "(none)"}${retryBlock}
 
 Return JSON of the form:
 {
@@ -130,23 +141,53 @@ Return JSON of the form:
 }
 
 The "summary" should be 2-5 short bullets in plain English (e.g. "Tightened opening paragraph to 52 words", "Replaced [Hiring Manager] placeholder with Hiring Team", "Fixed 2 grammar issues"). Only describe what you actually changed.`;
+}
 
+async function callLLM(system: string, user: string): Promise<{ coverLetter: string; emailSubject: string; summary: string[] }> {
   const result = await generateJSON<{
     coverLetter?: string;
     emailSubject?: string;
     summary?: unknown;
   }>({ system, user, maxTokens: 2000 });
 
-  const coverLetter = (result.coverLetter ?? "").trim();
-  const emailSubject = (result.emailSubject ?? "").trim();
-  const summary = Array.isArray(result.summary)
-    ? result.summary.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-    : [];
+  return {
+    coverLetter: (result.coverLetter ?? "").trim(),
+    emailSubject: (result.emailSubject ?? "").trim(),
+    summary: Array.isArray(result.summary)
+      ? result.summary.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+      : [],
+  };
+}
+
+export interface AutoCorrectAttemptOutcome {
+  result: AutoCorrectResult;
+  validation: AutoCorrectValidation;
+}
+
+export async function autoCorrectLetter(input: AutoCorrectInput): Promise<AutoCorrectAttemptOutcome> {
+  const targeted = input.failedCheckIds.filter((id) =>
+    (AUTO_CORRECTABLE_CHECK_IDS as readonly string[]).includes(id),
+  );
+
+  const system = buildSystemPrompt();
+
+  // First attempt
+  let attempt = await callLLM(system, buildUserPrompt(input, targeted));
+  let validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
+
+  // One retry, feeding the issue list back in
+  if (!validation.ok) {
+    attempt = await callLLM(system, buildUserPrompt(input, targeted, validation.issues));
+    validation = validateAutoCorrectOutput(attempt.coverLetter, attempt.emailSubject);
+  }
 
   return {
-    coverLetter,
-    emailSubject,
-    summary,
-    targetedCheckIds: targeted,
+    result: {
+      coverLetter: attempt.coverLetter,
+      emailSubject: attempt.emailSubject,
+      summary: attempt.summary,
+      targetedCheckIds: targeted,
+    },
+    validation,
   };
 }

@@ -9,11 +9,7 @@ import {
 import { fetchJobFromUrl, parseJob } from "../lib/jobParser";
 import { draftCoverLetter } from "../lib/letterWriter";
 import { validateApplication } from "../lib/validator";
-import {
-  autoCorrectLetter,
-  validateAutoCorrectOutput,
-  AUTO_CORRECTABLE_CHECK_IDS,
-} from "../lib/autoCorrect";
+import { autoCorrectLetter, AUTO_CORRECTABLE_CHECK_IDS } from "../lib/autoCorrect";
 import { sendEmail } from "../lib/agentMail";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -306,7 +302,7 @@ router.post("/applications/:id/auto-correct", async (req, res): Promise<void> =>
   }
 
   try {
-    const result = await autoCorrectLetter({
+    const { result, validation } = await autoCorrectLetter({
       profile,
       coverLetter: app.coverLetter,
       emailSubject: app.emailSubject,
@@ -318,7 +314,6 @@ router.post("/applications/:id/auto-correct", async (req, res): Promise<void> =>
       failedCheckIds: failedAutoCheckIds,
     });
 
-    const validation = validateAutoCorrectOutput(result.coverLetter, result.emailSubject);
     if (!validation.ok) {
       res.status(422).json({
         error: "Auto-fix produced output that still fails validation.",
